@@ -161,7 +161,9 @@ function App() {
         </button>
       </div>
       <div>
-        {fileList.map((file, index) => (
+      {fileList
+        .filter(file => file.name !== 'placeholder.txt') // Exclude "placeholder.txt"
+        .map((file, index) => (
           <div key={index}>
             {file.blob && <img src={URL.createObjectURL(file.blob)} alt={`Photo ${index}`} />}
             {file.url && <img src={file.url} alt={`Photo ${index}`} />}
