@@ -6,9 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 function App() {
   const [fileList, setFileList] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState('default');
-  const [folderList, setFolderList] = useState(['default']);
-  const fileRef = ref(storage, '/files/');
+  const [selectedFolder, setSelectedFolder] = useState('files');
+  const [folderList, setFolderList] = useState(['files']);
+  const fileRef = ref(storage, '/');
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
 
@@ -75,7 +75,7 @@ function App() {
   const uploadFile = (file) => {
     if (!file) return;
 
-    const folderPath = selectedFolder === 'default' ? '' : `${selectedFolder}/`;
+    const folderPath = selectedFolder === 'files' ? '' : `${selectedFolder}/`;
     const fileRef = ref(storage, `/${folderPath}${file.name}`);
     uploadBytes(fileRef, file.blob)
       .then(() => {
@@ -90,13 +90,13 @@ function App() {
     listAll(fileRef)
       .then((response) => {
         const folders = response.prefixes.map((prefix) => prefix.name);
-        setFolderList((prev) => [...prev, ...folders]);
+        setFolderList(['files', ...folders]); // Include 'files' as the default option
       })
       .catch((error) => {
         console.error('Error listing folders:', error);
       });
-  
-    const folderPath = selectedFolder === 'default' ? '' : `${selectedFolder}/`;
+
+    const folderPath = selectedFolder === 'files' ? '' : `${selectedFolder}/`;
     const folderRef = ref(storage, folderPath);
     listAll(folderRef)
       .then((response) => {
@@ -116,11 +116,11 @@ function App() {
       .catch((error) => {
         console.error('Error listing files:', error);
       });
-  
+
     return () => {
       stopCamera();
     };
-  }, [selectedFolder]); 
+  }, [selectedFolder]);
 
   const handleFolderChange = (e) => {
     setSelectedFolder(e.target.value);
