@@ -1,2 +1,3 @@
-# FileUploader
-Project Pics Uploaded directly into folders
+#FileUploader
+
+Upload files directly into the folder
