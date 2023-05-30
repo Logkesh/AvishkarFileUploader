@@ -2,19 +2,41 @@ import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { storage } from './firebase';
 import { ref, uploadBytes, listAll, getDownloadURL } from 'firebase/storage';
-import { v4 } from 'uuid';
-
-// Rest of your code...
-
+import { v4 as uuidv4 } from 'uuid';
 
 function App() {
   const [fileList, setFileList] = useState([]);
-  const fileRef = ref(storage, 'files/');
+  const [selectedFolder, setSelectedFolder] = useState('default');
+  const [folderList, setFolderList] = useState(['default']);
+  const fileRef = ref(storage, '/files/');
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
 
+  const [newFolderName, setNewFolderName] = useState('');
+
+  const handleNewFolderChange = (e) => {
+    setNewFolderName(e.target.value);
+  };
+
+  const createNewFolder = () => {
+    const folderName = newFolderName.trim();
+    if (folderName === '') return;
+
+    const folderRef = ref(storage, `/${folderName}/placeholder.txt`);
+    uploadBytes(folderRef, new Uint8Array())
+      .then(() => {
+        alert('Folder created');
+        setFolderList((prev) => [...prev, folderName]);
+        setNewFolderName('');
+      })
+      .catch((error) => {
+        console.error('Error creating folder:', error);
+      });
+  };
+
   const startCamera = () => {
-    navigator.mediaDevices.getUserMedia({ video: true })
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
       .then((stream) => {
         videoRef.current.srcObject = stream;
         setStream(stream);
@@ -36,9 +58,13 @@ function App() {
       const videoTrack = videoRef.current.srcObject.getVideoTracks()[0];
       const imageCapture = new ImageCapture(videoTrack);
 
-      imageCapture.takePhoto()
+      imageCapture
+        .takePhoto()
         .then((blob) => {
-          setFileList((prev) => [...prev, { blob: blob, name: `photo_${v4()}.jpg` }]);
+          const fileName = `photo_${uuidv4()}.jpg`;
+          const file = { blob, name: fileName };
+          setFileList((prev) => [...prev, file]);
+          uploadFile(file);
         })
         .catch((error) => {
           console.error('Error capturing photo:', error);
@@ -48,8 +74,10 @@ function App() {
 
   const uploadFile = (file) => {
     if (!file) return;
-    const fileRef = ref(storage, `files/${file.name}`);
-    uploadBytes(fileRef, file)
+
+    const folderPath = selectedFolder === 'default' ? '' : `${selectedFolder}/`;
+    const fileRef = ref(storage, `/${folderPath}${file.name}`);
+    uploadBytes(fileRef, file.blob)
       .then(() => {
         alert('File uploaded');
       })
@@ -61,27 +89,64 @@ function App() {
   useEffect(() => {
     listAll(fileRef)
       .then((response) => {
-        response.items.forEach((item) => {
-          getDownloadURL(item)
-            .then((url) => {
-              setFileList((prev) => [...prev, { url: url, name: item.name }]);
-            })
-            .catch((error) => {
-              console.error('Error getting download URL:', error);
-            });
-        });
+        const folders = response.prefixes.map((prefix) => prefix.name);
+        setFolderList((prev) => [...prev, ...folders]);
+      })
+      .catch((error) => {
+        console.error('Error listing folders:', error);
+      });
+  
+    const folderPath = selectedFolder === 'default' ? '' : `${selectedFolder}/`;
+    const folderRef = ref(storage, folderPath);
+    listAll(folderRef)
+      .then((response) => {
+        const files = response.items;
+        Promise.all(files.map((file) => getDownloadURL(file)))
+          .then((urls) => {
+            const updatedFileList = files.map((file, index) => ({
+              url: urls[index],
+              name: file.name,
+            }));
+            setFileList(updatedFileList);
+          })
+          .catch((error) => {
+            console.error('Error getting download URLs:', error);
+          });
       })
       .catch((error) => {
         console.error('Error listing files:', error);
       });
-
+  
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [selectedFolder]); 
+
+  const handleFolderChange = (e) => {
+    setSelectedFolder(e.target.value);
+  };
+
+  const renderFolderOptions = () => {
+    return folderList.map((folder, index) => (
+      <option key={index} value={folder}>
+        {folder}
+      </option>
+    ));
+  };
 
   return (
     <div className="App">
+      <div>
+        <label>New Folder:</label>
+        <input type="text" value={newFolderName} onChange={handleNewFolderChange} />
+        <button onClick={createNewFolder}>Create Folder</button>
+      </div>
+      <div>
+        <label>Select Folder:</label>
+        <select value={selectedFolder} onChange={handleFolderChange}>
+          {renderFolderOptions()}
+        </select>
+      </div>
       <div>
         <video ref={videoRef} width="400" height="300" autoPlay muted></video>
       </div>
@@ -91,7 +156,9 @@ function App() {
         ) : (
           <button onClick={startCamera}>Start Camera</button>
         )}
-        <button onClick={capturePhoto} disabled={!stream}>Capture Photo</button>
+        <button onClick={capturePhoto} disabled={!stream}>
+          Capture Photo
+        </button>
       </div>
       <div>
         {fileList.map((file, index) => (
