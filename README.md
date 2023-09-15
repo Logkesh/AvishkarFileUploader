@@ -1,3 +1,4 @@
-# FileUploader
+# Selfie Booth
 ## Avishkar 
-Upload files directly into the folder
+Upload All The Project Pics
+
